@@ -12,16 +12,29 @@ before (logins, cookies, extensions) is never used. This extension injects
 `--browser`, `--profile`/`--persistent` (and optionally a specific
 `--profile-directory`) on every `open`, and keeps one browser alive per session.
 
-## Load it
+## Install
 
-It lives outside the default extensions dir, so load it explicitly:
+```bash
+pi install git:github.com/tpthanhan/pi-browser-profile
+```
+
+This declares `pi-playwright` as a dependency, so installing this package also
+installs `pi-playwright` (and its bundled `@playwright/cli`) and loads the
+`pi-playwright` skill alongside this extension's `browser` tool and
+`/browser-profile` command. One install, everything you need.
+
+If browsers aren't present yet (only needed for the bundled `chromium`; the
+`chrome` channel uses your installed Google Chrome), run once:
+
+```bash
+npx playwright install chromium
+```
+
+### Local development
 
 ```bash
 pi --extension C:/Personal/pi-browser-profile/index.ts
 ```
-
-Or add `C:/Personal/pi-browser-profile` to your Pi `resources` paths in settings
-so it loads every session.
 
 ## Configure
 

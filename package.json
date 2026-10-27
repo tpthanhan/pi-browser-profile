@@ -5,7 +5,11 @@
   "type": "module",
   "keywords": ["pi-package"],
   "pi": {
-    "extensions": ["./index.ts"]
+    "extensions": ["./index.ts"],
+    "skills": ["./node_modules/pi-playwright/skills"]
+  },
+  "dependencies": {
+    "pi-playwright": "^0.1.2"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
