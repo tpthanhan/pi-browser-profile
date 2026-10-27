@@ -43,16 +43,37 @@ Edit `config.json`, or from inside Pi:
 ```
 /browser-profile                      # show current config
 /browser-profile set browser chrome   # chromium | chrome | msedge | firefox | webkit
+/browser-profile set profileName playwright   # use a Chrome/Edge profile by its display name
 /browser-profile set profile C:/Users/you/pi-chrome-profile
-/browser-profile set profileDirectory "Profile 1"   # optional sub-profile
+/browser-profile set profileDirectory "Profile 1"   # optional sub-profile (folder name)
 /browser-profile set persistent true
 /browser-profile set headed true
 /browser-profile set session pi-profile
 ```
 
+### Use an existing Chrome/Edge profile by name (easiest)
+
+If you already created a profile in Chrome (e.g. named **"playwright"**), just
+set `profileName` — the extension finds the right user-data-dir and folder for
+you by reading the browser's `Local State`:
+
+```
+/browser-profile set browser chrome
+/browser-profile set profileName playwright
+```
+
+It resolves the display name to the real folder (e.g. `Profile 3`) automatically.
+You can also pass the folder name itself (`Profile 3`) to `profileName`.
+
+> **Important:** Launching a real Chrome/Edge profile requires that browser to be
+> **fully closed** first (all windows). Chrome locks its user-data-dir, so if it's
+> running the launch fails. For a profile you use all day, prefer a dedicated
+> user-data-dir (see below) so you never have to close your main browser.
+
 | Key                | Meaning                                                                |
 |--------------------|------------------------------------------------------------------------|
 | `browser`          | Which browser/channel to launch.                                       |
+| `profileName`      | Chrome/Edge profile by DISPLAY name (e.g. `playwright`). Auto-resolves user-data-dir + folder. Overrides the two below. |
 | `profile`          | Absolute path to a user-data-dir. Empty = managed persistent dir.      |
 | `profileDirectory` | Specific profile subfolder (e.g. `Default`, `Profile 1`). Optional.    |
 | `persistent`       | Keep profile on disk between runs (auto when `profile` is set).        |

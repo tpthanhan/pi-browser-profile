@@ -42,6 +42,12 @@ interface Config {
 	profile: string;
 	/** optional specific profile subfolder, e.g. "Default" or "Profile 1". */
 	profileDirectory: string;
+	/**
+	 * Chrome/Edge profile by its DISPLAY name (what you see in the browser),
+	 * e.g. "playwright". Resolved to the right folder via the browser's
+	 * `Local State`. Overrides profile/profileDirectory when set.
+	 */
+	profileName: string;
 	/** keep profile on disk between runs (auto-true when `profile` is set). */
 	persistent: boolean;
 	/** run visibly. Usually true when you want to reuse a real profile. */
@@ -56,11 +62,72 @@ const DEFAULT_CONFIG: Config = {
 	browser: "chrome",
 	profile: "",
 	profileDirectory: "",
+	profileName: "",
 	persistent: true,
 	headed: true,
 	session: "pi-profile",
 	playwrightCliEntry: "",
 };
+
+/** Default user-data-dir for a Chromium-family channel, per OS. */
+function defaultUserDataDir(browser: BrowserName): string {
+	const home = homedir();
+	const local = process.env.LOCALAPPDATA || join(home, "AppData", "Local");
+	if (browser === "chrome") {
+		if (process.platform === "win32") return join(local, "Google", "Chrome", "User Data");
+		if (process.platform === "darwin")
+			return join(home, "Library", "Application Support", "Google", "Chrome");
+		return join(home, ".config", "google-chrome");
+	}
+	if (browser === "msedge") {
+		if (process.platform === "win32") return join(local, "Microsoft", "Edge", "User Data");
+		if (process.platform === "darwin")
+			return join(home, "Library", "Application Support", "Microsoft Edge");
+		return join(home, ".config", "microsoft-edge");
+	}
+	return ""; // chromium/firefox/webkit have no standard shared profile location
+}
+
+/** Map a profile DISPLAY name to its folder (e.g. "playwright" -> "Profile 3"). */
+function findProfileDirByName(userDataDir: string, name: string): string {
+	const lsPath = join(userDataDir, "Local State");
+	let cache: Record<string, { name?: string }> = {};
+	try {
+		cache = JSON.parse(readFileSync(lsPath, "utf8"))?.profile?.info_cache ?? {};
+	} catch {
+		throw new Error(
+			`Could not read "${lsPath}". Is "${userDataDir}" the right user-data-dir for this browser?`,
+		);
+	}
+	const target = name.trim().toLowerCase();
+	// Allow passing the folder name directly too (e.g. "Profile 3").
+	for (const dir of Object.keys(cache)) {
+		if (dir.toLowerCase() === target) return dir;
+	}
+	for (const [dir, info] of Object.entries(cache)) {
+		if (String(info?.name ?? "").trim().toLowerCase() === target) return dir;
+	}
+	const avail = Object.entries(cache)
+		.map(([dir, info]) => `"${info?.name ?? "(no name)"}" [${dir}]`)
+		.join(", ");
+	throw new Error(
+		`No profile named "${name}" in ${userDataDir}.\nAvailable profiles: ${avail || "(none found)"}`,
+	);
+}
+
+/** Resolve `profileName` into concrete profile + profileDirectory. */
+function resolveEffectiveConfig(cfg: Config): Config {
+	if (!cfg.profileName) return cfg;
+	const userDataDir = cfg.profile || defaultUserDataDir(cfg.browser);
+	if (!userDataDir) {
+		throw new Error(
+			`profileName is set but no default user-data-dir is known for browser "${cfg.browser}". ` +
+				`Set "profile" to the user-data-dir path, or use browser chrome/msedge.`,
+		);
+	}
+	const dir = findProfileDirByName(userDataDir, cfg.profileName);
+	return { ...cfg, profile: userDataDir, profileDirectory: dir };
+}
 
 function loadConfig(): Config {
 	try {
@@ -198,6 +265,7 @@ function cap(text: string): string {
 function describe(cfg: Config): string {
 	return [
 		`browser:          ${cfg.browser}`,
+		`profileName:      ${cfg.profileName || "(not set)"}`,
 		`profile:          ${cfg.profile || "(managed persistent dir)"}`,
 		`profileDirectory: ${cfg.profileDirectory || "(default)"}`,
 		`persistent:       ${cfg.persistent}`,
@@ -232,7 +300,15 @@ export default function (pi: ExtensionAPI) {
 			),
 		}),
 		async execute(_id, params, signal) {
-			const cfg = loadConfig();
+			let cfg = loadConfig();
+			try {
+				cfg = resolveEffectiveConfig(cfg);
+			} catch (err) {
+				return {
+					content: [{ type: "text", text: `Error: ${(err as Error).message}` }],
+					details: undefined,
+				};
+			}
 			let entry: string;
 			try {
 				entry = resolveCliEntry(cfg);
@@ -265,7 +341,7 @@ export default function (pi: ExtensionAPI) {
 	pi.registerCommand("browser-profile", {
 		description:
 			"Show or change the browser/profile used by the `browser` tool. " +
-			"Usage: /browser-profile [set <key> <value>]. Keys: browser, profile, profileDirectory, persistent, headed, session, playwrightCliEntry.",
+			"Usage: /browser-profile [set <key> <value>]. Keys: browser, profileName, profile, profileDirectory, persistent, headed, session, playwrightCliEntry.",
 		handler: async (argStr, ctx) => {
 			const cfg = loadConfig();
 			const parts = (argStr ?? "").trim().split(/\s+/).filter(Boolean);
@@ -283,6 +359,7 @@ export default function (pi: ExtensionAPI) {
 					"browser",
 					"profile",
 					"profileDirectory",
+					"profileName",
 					"session",
 					"playwrightCliEntry",
 				];
@@ -301,7 +378,7 @@ export default function (pi: ExtensionAPI) {
 
 			ctx.ui.notify(
 				"Usage: /browser-profile [show | set <key> <value>]\n" +
-					"Keys: browser, profile, profileDirectory, persistent, headed, session, playwrightCliEntry",
+					"Keys: browser, profileName, profile, profileDirectory, persistent, headed, session, playwrightCliEntry",
 				"info",
 			);
 		},
