@@ -1,8 +1,14 @@
 {
   "name": "pi-browser-profile",
   "version": "0.1.0",
-  "private": true,
   "description": "Pi extension: drive a browser via playwright-cli with a configurable browser + user profile.",
   "type": "module",
-  "main": "index.ts"
+  "keywords": ["pi-package"],
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  }
 }
