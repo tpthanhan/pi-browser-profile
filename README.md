@@ -1,0 +1,85 @@
+# pi-browser-profile
+
+A Pi extension that drives a browser through the bundled `@playwright/cli` (the
+same CLI the `pi-playwright` skill uses) **but lets you pin which browser and
+which user profile it launches with**.
+
+## Why
+
+`pi-playwright` always opens a fresh, isolated, throwaway profile with bundled
+Chromium — it never passes `--profile` / `--persistent`, so a profile you set up
+before (logins, cookies, extensions) is never used. This extension injects
+`--browser`, `--profile`/`--persistent` (and optionally a specific
+`--profile-directory`) on every `open`, and keeps one browser alive per session.
+
+## Load it
+
+It lives outside the default extensions dir, so load it explicitly:
+
+```bash
+pi --extension C:/Personal/pi-browser-profile/index.ts
+```
+
+Or add `C:/Personal/pi-browser-profile` to your Pi `resources` paths in settings
+so it loads every session.
+
+## Configure
+
+Edit `config.json`, or from inside Pi:
+
+```
+/browser-profile                      # show current config
+/browser-profile set browser chrome   # chromium | chrome | msedge | firefox | webkit
+/browser-profile set profile C:/Users/you/pi-chrome-profile
+/browser-profile set profileDirectory "Profile 1"   # optional sub-profile
+/browser-profile set persistent true
+/browser-profile set headed true
+/browser-profile set session pi-profile
+```
+
+| Key                | Meaning                                                                |
+|--------------------|------------------------------------------------------------------------|
+| `browser`          | Which browser/channel to launch.                                       |
+| `profile`          | Absolute path to a user-data-dir. Empty = managed persistent dir.      |
+| `profileDirectory` | Specific profile subfolder (e.g. `Default`, `Profile 1`). Optional.    |
+| `persistent`       | Keep profile on disk between runs (auto when `profile` is set).        |
+| `headed`           | Launch visibly (recommended when reusing a real profile).              |
+| `session`          | playwright-cli session name — one browser per name.                    |
+| `playwrightCliEntry` | Override path to `playwright-cli.js`. Empty = auto-detect.            |
+
+### Recommended setup (dedicated profile)
+
+Chrome refuses to launch a user-data-dir that your everyday Chrome already has
+open (SingletonLock). So point `profile` at a **dedicated** directory, launch it
+once headed, log in, and it's reused forever after:
+
+```
+/browser-profile set browser chrome
+/browser-profile set profile C:/Users/you/pi-chrome-profile
+/browser-profile set headed true
+```
+
+Then ask the agent to open a page; sign in once in the window that appears.
+
+## Use (the agent calls the `browser` tool)
+
+```
+browser  command=open   args=["https://example.com"]
+browser  command=snapshot args=["--filename","C:/tmp/snap.md"]
+browser  command=click  args=["e5"]
+browser  command=fill   args=["e4","hello@example.com"]
+browser  command=eval   args=["() => document.title"]
+browser  command=close
+```
+
+`open` injects the configured browser/profile/headed automatically. Large output
+(snapshot, screenshot, pdf) should go to a file via `--filename`.
+
+## Notes / limitations
+
+- Uses the `@playwright/cli` already installed with `pi-playwright`. If it can't
+  be found, set `playwrightCliEntry` in `config.json`.
+- A specific `profileDirectory` is applied via a generated one-off cli config
+  file carrying `--profile-directory`.
+- Close the everyday browser using the same profile before launching, or use a
+  dedicated profile dir, to avoid lock conflicts.

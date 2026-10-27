@@ -1,0 +1,9 @@
+{
+  "browser": "chrome",
+  "profile": "",
+  "profileDirectory": "",
+  "persistent": true,
+  "headed": true,
+  "session": "pi-profile",
+  "playwrightCliEntry": ""
+}
