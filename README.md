@@ -36,9 +36,25 @@ npx playwright install chromium
 pi --extension C:/Personal/pi-browser-profile/index.ts
 ```
 
+## Where settings are saved
+
+Your editable settings live at a **stable user location** so they survive package
+reinstalls/updates:
+
+```
+~/.pi/agent/pi-browser-profile.json
+```
+
+(on this machine: `C:\Users\921747\.pi\agent\pi-browser-profile.json`)
+
+The `config.json` shipped in this repo is only used as **seed defaults** the first
+time, before a user config exists. The `/browser-profile` command writes to the
+user location above. Override the path with the `PI_BROWSER_PROFILE_CONFIG`
+environment variable. Run `/browser-profile` to see the active path.
+
 ## Configure
 
-Edit `config.json`, or from inside Pi:
+Set values from inside Pi (written to `~/.pi/agent/pi-browser-profile.json`):
 
 ```
 /browser-profile                      # show current config

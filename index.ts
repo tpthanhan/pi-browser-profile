@@ -20,7 +20,7 @@
  * Config lives in `config.json` next to this file and persists across sessions.
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdtempSync, mkdirSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { tmpdir, homedir } from "node:os";
@@ -31,7 +31,20 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = join(__dirname, "config.json");
+
+/**
+ * Where the editable config lives.
+ *
+ * Writes go to a STABLE user location under ~/.pi/agent so your settings
+ * survive package reinstalls/updates (the installed package dir is replaced on
+ * update). The `config.json` shipped in the repo is only read as seed defaults
+ * when no user config exists yet. Override the path with
+ * PI_BROWSER_PROFILE_CONFIG.
+ */
+const USER_CONFIG_PATH =
+	process.env.PI_BROWSER_PROFILE_CONFIG ||
+	join(homedir(), ".pi", "agent", "pi-browser-profile.json");
+const BUNDLED_CONFIG_PATH = join(__dirname, "config.json");
 
 type BrowserName = "chromium" | "chrome" | "msedge" | "firefox" | "webkit";
 
@@ -130,16 +143,21 @@ function resolveEffectiveConfig(cfg: Config): Config {
 }
 
 function loadConfig(): Config {
-	try {
-		const raw = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
-		return { ...DEFAULT_CONFIG, ...raw };
-	} catch {
-		return { ...DEFAULT_CONFIG };
+	// Prefer the user-global config; fall back to defaults shipped with the package.
+	for (const path of [USER_CONFIG_PATH, BUNDLED_CONFIG_PATH]) {
+		try {
+			const raw = JSON.parse(readFileSync(path, "utf8"));
+			return { ...DEFAULT_CONFIG, ...raw };
+		} catch {
+			/* try next source */
+		}
 	}
+	return { ...DEFAULT_CONFIG };
 }
 
 function saveConfig(cfg: Config): void {
-	writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2) + "\n", "utf8");
+	mkdirSync(dirname(USER_CONFIG_PATH), { recursive: true });
+	writeFileSync(USER_CONFIG_PATH, JSON.stringify(cfg, null, 2) + "\n", "utf8");
 }
 
 /** Find the installed playwright-cli entry across likely install roots. */
@@ -272,6 +290,8 @@ function describe(cfg: Config): string {
 		`headed:           ${cfg.headed}`,
 		`session:          ${cfg.session}`,
 		`playwrightCli:    ${cfg.playwrightCliEntry || "(auto-detect)"}`,
+		``,
+		`config file:      ${USER_CONFIG_PATH}`,
 	].join("\n");
 }
 
